@@ -79,10 +79,10 @@ if run_button:
 
                     if target_code not in df.columns:
                          st.error(f"입력하신 코드 '{target_code}'가 데이터 파일의 컬럼에 존재하지 않습니다.")
-                    else:
+                 else:
                         df[target_code] = pd.to_numeric(df[target_code], errors='coerce').fillna(0)
                         daily_sum = df.groupby('일자')[target_code].sum()
-                        daily_sum = daily_sum[daily_sum[daily_sum.columns[0]] > 0]
+                        daily_sum = daily_sum[daily_sum > 0] # ✅ 이렇게 간단하게 바꿔주세요!
                         df_prophet_full = daily_sum.reset_index()
                         df_prophet_full.columns = ['ds', 'y']
 
