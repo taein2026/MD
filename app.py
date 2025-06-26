@@ -2,6 +2,15 @@
 
 # ✅ 1. 라이브러리 불러오기
 import streamlit as st
+# Google Fonts Noto Sans KR 적용 (이 부분을 추가해주세요)
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+html, body, [class*="st-"], [class*="css-"]  {
+   font-family: 'Noto Sans KR', sans-serif;
+}
+</style>
+""", unsafe_allow_html=True)
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -92,7 +101,7 @@ if run_button:
                         forecast = model.predict(total_dates)
 
                         # --- 결과 시각화 1 ---
-                        st.subheader("📊 종합 예측 결과")
+                        st.subheader("종합 예측 결과")
                         last_date = df_prophet['ds'].max()
                         history_fc = forecast[forecast['ds'] <= last_date]
                         future_fc = forecast[forecast['ds'] > last_date]
