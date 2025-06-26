@@ -9,7 +9,7 @@ from prophet import Prophet
 import io
 import datetime
 
-# Google Fonts Noto Sans KR 적용
+# Google Fonts Noto Sans KR 적용 (웹페이지 기본 텍스트용)
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
@@ -19,21 +19,22 @@ html, body, [class*="st-"], [class*="css-"]  {
 </style>
 """, unsafe_allow_html=True)
 
-# Matplotlib 한글 폰트 설정
+# Matplotlib 한글 폰트 설정 (그래프용)
 try:
     plt.rc('font', family='NanumGothic')
 except:
     try:
-        plt.rc('font', family='Malgun Gothic')
+        plt.rc('font', family='Malgun Gothic') # Windows
     except:
         try:
-            plt.rc('font', family='AppleGothic')
+            plt.rc('font', family='AppleGothic') # Mac
         except:
-            pass
-plt.rcParams['axes.unicode_minus'] = False
+            pass # 폰트가 없어도 앱은 실행되도록 함
+plt.rcParams['axes.unicode_minus'] = False # 마이너스 기호 깨짐 방지
+
 
 # ==============================================================================
-# 💻 웹 애플리케이션 UI 구성 (✨수정된 부분✨)
+# 💻 웹 애플리케이션 UI 구성
 # ==============================================================================
 st.title("💊 의약품 처방량 예측 애플리케이션")
 st.write("과거 특정 시점을 기준으로 미래 처방량을 예측하는 시나리오 분석을 수행합니다.")
@@ -51,7 +52,7 @@ forecast_period = st.sidebar.number_input("예측 기간 (일)", min_value=1, ma
 run_button = st.sidebar.button("🚀 예측 실행")
 
 # ==============================================================================
-# 📈 예측 및 시각화 실행 (✨수정된 부분✨)
+# 📈 예측 및 시각화 실행
 # ==============================================================================
 if run_button:
     if csv_file and xlsx_file and target_code_input:
@@ -78,18 +79,18 @@ if run_button:
                     df_prophet_full = daily_sum.reset_index()
                     df_prophet_full.columns = ['ds', 'y']
 
-                    # --- ✨ 사용자가 선택한 '예측 기준일'까지의 데이터만 필터링하여 학습 데이터로 사용 ---
+                    # --- 사용자가 선택한 '예측 기준일'까지의 데이터만 필터링하여 학습 데이터로 사용 ---
                     base_date_dt = pd.to_datetime(forecast_base_date)
                     df_prophet_train = df_prophet_full[df_prophet_full['ds'] <= base_date_dt]
                     
                     if df_prophet_train.empty:
                         st.error(f"선택하신 '{forecast_base_date.strftime('%Y-%m-%d')}'까지의 기간에 처방 기록이 없습니다.")
                     else:
-                        # --- ✨ 필터링된 데이터로 새 모델 학습 ---
+                        # --- 필터링된 데이터로 새 모델 학습 ---
                         model = Prophet(daily_seasonality=True)
                         model.fit(df_prophet_train)
 
-                        # --- ✨ 예측 기준일로부터 14일(사용자 입력값) 미래 예측 ---
+                        # --- 예측 기준일로부터 사용자 입력 기간만큼 미래 예측 ---
                         future = model.make_future_dataframe(periods=forecast_period, freq='D')
                         forecast = model.predict(future)
 
