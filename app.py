@@ -8,7 +8,6 @@ import matplotlib.dates as mdates
 from prophet import Prophet
 import io
 import datetime
-import numpy as np
 
 # Google Fonts Noto Sans KR 적용 (웹페이지 기본 텍스트용)
 st.markdown("""
@@ -37,8 +36,8 @@ plt.rcParams['axes.unicode_minus'] = False # 마이너스 기호 깨짐 방지
 # ==============================================================================
 # 💻 웹 애플리케이션 UI 구성 (✨수정된 부분✨)
 # ==============================================================================
-st.title("💊 의약품 재고 예측 및 관리 시스템")
-st.write("지정한 기간의 데이터를 학습하여 미래 처방량을 예측하고, 현재 재고의 소진 시점을 분석합니다.")
+st.title("💊 의약품 30일 재고 예측 시스템")
+st.write("지정한 기간의 데이터로 학습하여, **향후 30일간의 재고 상태**를 분석합니다.")
 
 st.sidebar.header("⚙️ 분석 설정")
 csv_file = st.sidebar.file_uploader("진료 내역 데이터 (CSV)", type="csv")
@@ -49,10 +48,10 @@ st.sidebar.subheader("3. 예측 시나리오 설정")
 train_start_date = st.sidebar.date_input("학습 시작일", datetime.date(2023, 1, 1))
 train_end_date = st.sidebar.date_input("학습 종료일 (이 날짜를 기준으로 예측)", datetime.date(2023, 12, 31))
 
-# --- ✨ 현재 재고량 입력 기능 추가 ✨ ---
 st.sidebar.subheader("4. 재고 분석 설정")
 current_stock = st.sidebar.number_input("현재 재고량 입력", min_value=0, value=100)
-forecast_period = 180 # 재고 분석을 위해 예측 기간을 6개월로 고정
+# 예측 기간을 30일로 고정
+forecast_period = 30 
 
 run_button = st.sidebar.button("🚀 분석 실행")
 
@@ -99,34 +98,31 @@ if run_button:
                             future = model.make_future_dataframe(periods=forecast_period, freq='D')
                             forecast = model.predict(future)
                             
-                            # --- ✨ 재고 소진일 계산 로직 ✨ ---
-                            # 예측 결과에서 미래 부분만 추출
+                            # --- 재고 소진일 계산 로직 ---
                             future_fc = forecast[forecast['ds'] > end_date_dt].copy()
-                            # 예측 처방량이 음수일 경우 0으로 처리
                             future_fc['yhat'] = future_fc['yhat'].clip(lower=0)
-                            # 날짜별 누적 처방량 계산
                             future_fc['cumulative_yhat'] = future_fc['yhat'].cumsum()
-                            
-                            # 누적 처방량이 현재 재고량을 초과하는 첫 날 찾기
                             stock_out_day = future_fc[future_fc['cumulative_yhat'] >= current_stock]
 
-                            # --- ✨ 결과 텍스트 출력 ✨ ---
-                            st.subheader("📦 재고 분석 결과")
-                            col1, col2 = st.columns(2)
+                            # --- 결과 텍스트 출력 ---
+                            st.subheader("📦 30일 재고 분석 결과")
+                            col1, col2, col3 = st.columns(3)
                             col1.metric("현재 재고량", f"{current_stock} 개")
 
                             if not stock_out_day.empty:
                                 stock_out_date = stock_out_day.iloc[0]['ds']
                                 days_left = (stock_out_date - end_date_dt).days
-                                col2.metric("재고 소진까지 남은 기간", f"약 {days_left} 일", f"예상 소진일: {stock_out_date.strftime('%Y-%m-%d')}")
-                                st.success(f"**분석 요약:** 현재 재고({current_stock}개)는 앞으로 **약 {days_left}일** 후인 **{stock_out_date.strftime('%Y-%m-%d')}** 경에 소진될 것으로 예측됩니다.")
+                                col2.metric("재고 상태", "소진 예상", f"-{days_left}일 후 소진")
+                                col3.metric("예상 소진일", f"{stock_out_date.strftime('%Y-%m-%d')}")
+                                st.warning(f"**분석 요약:** 현재 재고({current_stock}개)는 앞으로 **약 {days_left}일** 후인 **{stock_out_date.strftime('%Y-%m-%d')}** 경에 소진될 것으로 예측됩니다. 재고 보충이 필요합니다.")
                             else:
-                                col2.metric("재고 소진까지 남은 기간", f"{forecast_period} 일 이상")
-                                st.info(f"**분석 요약:** 현재 재고({current_stock}개)는 예측 기간인 **{forecast_period}일** 내에는 소진되지 않을 것으로 보입니다.")
+                                col2.metric("재고 상태", "재고 안정", "30일 내 소진 안됨")
+                                thirty_days_later = end_date_dt + pd.Timedelta(days=30)
+                                col3.metric("예상 소진일", f"{thirty_days_later.strftime('%Y-%m-%d')} 이후")
+                                st.success(f"**분석 요약:** 현재 재고({current_stock}개)는 예측 기간인 **30일** 내에는 충분할 것으로 보입니다.")
 
-
-                            # --- ✨ 그래프 시각화 ✨ ---
-                            st.subheader(f"📊 {train_start_date.strftime('%Y-%m-%d')} ~ {train_end_date.strftime('%Y-%m-%d')} 데이터 학습 결과 및 예측")
+                            # --- 그래프 시각화 ---
+                            st.subheader(f"📊 {train_start_date.strftime('%Y-%m-%d')} ~ {train_end_date.strftime('%Y-%m-%d')} 데이터 학습 결과 및 30일 예측")
                             fig, ax = plt.subplots(figsize=(14, 7))
                             history_fc = forecast[forecast['ds'] <= end_date_dt]
                             
@@ -136,7 +132,6 @@ if run_button:
                             ax.plot(df_prophet_train['ds'], df_prophet_train['y'], 'k.', markersize=4, label='실제 처방량')
                             ax.axvline(x=end_date_dt, color='red', linestyle='--', linewidth=1.5, label='예측 시작일')
                             
-                            # 재고 소진일에 마커 표시
                             if not stock_out_day.empty:
                                 ax.axvline(x=stock_out_date, color='darkorange', linestyle=':', linewidth=2, label=f'재고 소진 예상일 ({days_left}일 후)')
 
