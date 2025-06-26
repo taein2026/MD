@@ -122,7 +122,7 @@ if run_button:
                         st.pyplot(fig1)
 
                         # --- 결과 시각화 2 ---
-                        st.subheader("🔬 처방 패턴 상세 분석")
+                        st.subheader("처방 패턴 상세 분석")
                         fig2 = model.plot_components(forecast)
                         title_map = {'trend': '장기적 추세','weekly': '주간 패턴','yearly': '연간 패턴','daily': '일간 패턴'}
                         weekday_map_kor = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일']
