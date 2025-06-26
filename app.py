@@ -65,12 +65,11 @@ if run_button:
             with st.spinner('데이터를 처리하고 모델을 학습하는 중입니다... 잠시만 기다려 주세요.'):
                 try:
                     # --- 데이터 불러오기 및 전처리 ---
-                    # ✨ '일일 총량' 데이터를 사용하기 위해 시간 정보는 제거합니다.
                     df = pd.read_csv(csv_file, encoding='cp949', low_memory=False)
                     name_map_df = pd.read_excel(xlsx_file)
                     name_map = dict(zip(name_map_df['연합회코드'].astype(str).str.strip(), name_map_df['연합회전용명'].astype(str).str.strip()))
                     df['진료일시'] = df['진료일시'].astype(str)
-                    df['일자'] = pd.to_datetime(df['진료일시'].str[:10], errors='coerce') # 시간 정보 제거
+                    df['일자'] = pd.to_datetime(df['진료일시'].str[:10], errors='coerce')
                     df.dropna(subset=['일자'], inplace=True)
                     
                     target_code = target_code_input.strip()
@@ -79,10 +78,11 @@ if run_button:
 
                     if target_code not in df.columns:
                          st.error(f"입력하신 코드 '{target_code}'가 데이터 파일의 컬럼에 존재하지 않습니다.")
-                 else:
+                    else:
                         df[target_code] = pd.to_numeric(df[target_code], errors='coerce').fillna(0)
                         daily_sum = df.groupby('일자')[target_code].sum()
-                        daily_sum = daily_sum[daily_sum > 0] # ✅ 이렇게 간단하게 바꿔주세요!
+                        # ✨ 여기서 오류가 수정되었습니다.
+                        daily_sum = daily_sum[daily_sum > 0]
                         df_prophet_full = daily_sum.reset_index()
                         df_prophet_full.columns = ['ds', 'y']
 
@@ -94,8 +94,7 @@ if run_button:
                             st.error(f"선택하신 기간에 처방 기록이 없습니다.")
                         else:
                             # --- 모델 학습 및 예측 ---
-                            # daily_seasonality는 False로 설정 (일별 데이터에는 의미 없음)
-                            model = Prophet(daily_seasonality=False)
+                            model = Prophet(daily_seasonality=False) # 일별 데이터이므로 daily_seasonality는 False
                             model.fit(df_prophet_train)
                             future = model.make_future_dataframe(periods=forecast_period, freq='D')
                             forecast = model.predict(future)
@@ -108,29 +107,56 @@ if run_button:
 
                             # --- 결과 텍스트 출력 ---
                             st.subheader("📦 30일 재고 분석 결과")
-                            # ... (이하 코드 동일) ...
-                            
+                            col1, col2, col3 = st.columns(3)
+                            col1.metric("현재 재고량", f"{current_stock} 개")
+
+                            if not stock_out_day.empty:
+                                stock_out_date = stock_out_day.iloc[0]['ds']
+                                days_left = (stock_out_date - end_date_dt).days
+                                col2.metric("재고 상태", "소진 예상", f"약 {days_left}일 후")
+                                col3.metric("예상 소진일", f"{stock_out_date.strftime('%Y-%m-%d')}")
+                                st.warning(f"**분석 요약:** 현재 재고({current_stock}개)는 약 {days_left}일 후 소진될 것으로 예측됩니다.")
+                            else:
+                                col2.metric("재고 상태", "재고 안정", "30일 내 소진 안됨")
+                                thirty_days_later = end_date_dt + pd.Timedelta(days=30)
+                                col3.metric("예상 소진일", f"{thirty_days_later.strftime('%Y-%m-%d')} 이후")
+                                st.success(f"**분석 요약:** 현재 재고({current_stock}개)는 30일 내에는 충분할 것으로 보입니다.")
+
                             # --- 종합 예측 그래프 시각화 ---
                             st.subheader(f"📊 {train_start_date.strftime('%Y-%m-%d')} ~ {train_end_date.strftime('%Y-%m-%d')} 데이터 학습 결과 및 30일 예측")
-                            # ... (이하 코드 동일) ...
-
-                            # --- ✨ 사용자 맞춤형 패턴 분석 그래프 (✨수정된 부분✨) ---
-                            st.subheader("🔬 학습된 데이터의 패턴 분석")
+                            fig1, ax1 = plt.subplots(figsize=(14, 7))
+                            history_fc = forecast[forecast['ds'] <= end_date_dt]
+                            future_fc = forecast[forecast['ds'] > end_date_dt]
+                            ax1.plot(history_fc['ds'], history_fc['yhat'], color='gray', linestyle='-', linewidth=1.5, label='과거 데이터 모델 적합')
+                            ax1.plot(future_fc['ds'], future_fc['yhat'], color='#0072B2', linestyle='-', linewidth=2, label='미래 예측')
+                            ax1.fill_between(future_fc['ds'], future_fc['yhat_lower'].clip(lower=0), future_fc['yhat_upper'], color='#0072B2', alpha=0.2)
+                            ax1.plot(df_prophet_train['ds'], df_prophet_train['y'], 'k.', markersize=4, label='실제 처방량')
+                            ax1.axvline(x=end_date_dt, color='red', linestyle='--', linewidth=1.5, label='예측 시작일')
+                            if not stock_out_day.empty:
+                                stock_out_date = stock_out_day.iloc[0]['ds']
+                                days_left = (stock_out_date - end_date_dt).days
+                                ax1.axvline(x=stock_out_date, color='darkorange', linestyle=':', linewidth=2, label=f'재고 소진 예상일 ({days_left}일 후)')
+                            ax1.set_title(f"{drug_name} ({target_code}) 처방량 예측", fontsize=16)
+                            ax1.set_xlabel("날짜", fontsize=12)
+                            ax1.set_ylabel("처방 수량", fontsize=12)
+                            ax1.legend()
+                            ax1.grid(True, which='major', c='gray', ls='-', lw=1, alpha=0.2)
+                            fig1.autofmt_xdate()
+                            st.pyplot(fig1)
                             
-                            # 패턴 분석용 예측 생성
+                            # --- 사용자 맞춤형 패턴 분석 그래프 ---
+                            st.subheader("🔬 학습된 데이터의 패턴 분석")
                             analysis_forecast = model.predict(model.make_future_dataframe(periods=365, freq='D'))
 
-                            fig_comp, axes = plt.subplots(2, 1, figsize=(10, 10)) # 2개의 그래프만 생성
+                            fig_comp, axes = plt.subplots(2, 1, figsize=(10, 10))
                             fig_comp.tight_layout(pad=5.0)
 
-                            # 1. 트렌드(Trend) 그래프
                             axes[0].plot(analysis_forecast['ds'], analysis_forecast['trend'], color='darkblue')
                             axes[0].set_title("장기적 처방량 추세", fontsize=14)
                             axes[0].set_xlabel("날짜")
                             axes[0].set_ylabel("처방량 변화")
                             axes[0].grid(True, linestyle='--', alpha=0.7)
 
-                            # 2. 주간 패턴(Weekly) - 막대그래프로 업무일만 표시
                             analysis_forecast['day_of_week'] = analysis_forecast['ds'].dt.day_name()
                             weekly_effect = analysis_forecast.groupby('day_of_week')['weekly'].mean()
                             day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
@@ -144,46 +170,9 @@ if run_button:
                             axes[1].set_xticklabels(kor_day_order)
 
                             st.pyplot(fig_comp)
-
                             st.info("ⓘ '일일 총량' 데이터로 학습하였기 때문에, '일간(시간별) 패턴'은 표시되지 않습니다.")
 
                 except Exception as e:
                     st.error(f"분석 중 오류가 발생했습니다: {e}")
     else:
         st.warning("모든 파일을 업로드하고 약물 코드를 입력한 후 버튼을 눌러주세요.")
-
-# 최종 코드 완성을 위해 생략된 부분 채우기
-if 'forecast' in locals() and 'df_prophet_train' in locals() and 'stock_out_day' in locals():
-    col1, col2, col3 = st.columns(3)
-    col1.metric("현재 재고량", f"{current_stock} 개")
-    if not stock_out_day.empty:
-        stock_out_date = stock_out_day.iloc[0]['ds']
-        days_left = (stock_out_date - pd.to_datetime(train_end_date)).days
-        col2.metric("재고 상태", "소진 예상", f"약 {days_left}일 후")
-        col3.metric("예상 소진일", f"{stock_out_date.strftime('%Y-%m-%d')}")
-        st.warning(f"**분석 요약:** 현재 재고({current_stock}개)는 약 {days_left}일 후 소진될 것으로 예측됩니다.")
-    else:
-        col2.metric("재고 상태", "재고 안정", "30일 내 소진 안됨")
-        thirty_days_later = pd.to_datetime(train_end_date) + pd.Timedelta(days=30)
-        col3.metric("예상 소진일", f"{thirty_days_later.strftime('%Y-%m-%d')} 이후")
-        st.success(f"**분석 요약:** 현재 재고({current_stock}개)는 30일 내에는 충분할 것으로 보입니다.")
-    
-    fig1, ax1 = plt.subplots(figsize=(14, 7))
-    history_fc = forecast[forecast['ds'] <= pd.to_datetime(train_end_date)]
-    future_fc = forecast[forecast['ds'] > pd.to_datetime(train_end_date)]
-    ax1.plot(history_fc['ds'], history_fc['yhat'], color='gray', linestyle='-', linewidth=1.5, label='과거 데이터 모델 적합')
-    ax1.plot(future_fc['ds'], future_fc['yhat'], color='#0072B2', linestyle='-', linewidth=2, label='미래 예측')
-    ax1.fill_between(future_fc['ds'], future_fc['yhat_lower'].clip(lower=0), future_fc['yhat_upper'], color='#0072B2', alpha=0.2)
-    ax1.plot(df_prophet_train['ds'], df_prophet_train['y'], 'k.', markersize=4, label='실제 처방량')
-    ax1.axvline(x=pd.to_datetime(train_end_date), color='red', linestyle='--', linewidth=1.5, label='예측 시작일')
-    if not stock_out_day.empty:
-        stock_out_date = stock_out_day.iloc[0]['ds']
-        days_left = (stock_out_date - pd.to_datetime(train_end_date)).days
-        ax1.axvline(x=stock_out_date, color='darkorange', linestyle=':', linewidth=2, label=f'재고 소진 예상일 ({days_left}일 후)')
-    ax1.set_title(f"{drug_name} ({target_code}) 처방량 예측", fontsize=16)
-    ax1.set_xlabel("날짜", fontsize=12)
-    ax1.set_ylabel("처방 수량", fontsize=12)
-    ax1.legend()
-    ax1.grid(True, which='major', c='gray', ls='-', lw=1, alpha=0.2)
-    fig1.autofmt_xdate()
-    st.pyplot(fig1)
