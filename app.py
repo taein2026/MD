@@ -124,49 +124,51 @@ if run_button:
                             st.subheader(f"📊 {train_start_date.strftime('%Y-%m-%d')} ~ {train_end_date.strftime('%Y-%m-%d')} 데이터 학습 결과 및 30일 예측")
                             # ... (이전과 동일하여 코드 생략) ...
 
-                            # --- ✨ 사용자 맞춤형 패턴 분석 그래프 (✨수정된 부분✨) ---
-                            st.subheader("🔬 사용자 맞춤형 패턴 분석")
-                            
-                            # 1. 트렌드(Trend) 그래프
-                            fig_trend, ax_trend = plt.subplots(figsize=(10, 4))
-                            model.plot_trend(forecast, ax=ax_trend)
-                            ax_trend.set_title("장기적 처방량 추세")
-                            ax_trend.set_xlabel("날짜")
-                            ax_trend.set_ylabel("처방량 변화")
-                            st.pyplot(fig_trend)
-                            
-                            # 2. 주간 패턴(Weekly) - 막대그래프로 업무일만 표시
-                            # 요일별 평균 'weekly' 효과 계산
-                            forecast['day_of_week'] = forecast['ds'].dt.day_name()
-                            weekly_effect = forecast.groupby('day_of_week')['weekly'].mean()
-                            # 월요일부터 토요일 순서로 정렬
-                            day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-                            weekly_effect = weekly_effect.reindex(day_order)
-                            kor_day_order = ["월", "화", "수", "목", "금", "토"]
+                           # --- ✨ 사용자 맞춤형 패턴 분석 그래프 (✨수정된 최종 버전✨) ---
+st.subheader("🔬 사용자 맞춤형 패턴 분석")
 
-                            fig_weekly, ax_weekly = plt.subplots(figsize=(10, 4))
-                            weekly_effect.plot(kind='bar', ax=ax_weekly, color='skyblue', width=0.6, rot=0)
-                            ax_weekly.set_title("주간 처방 패턴 (업무일 기준)")
-                            ax_weekly.set_xticklabels(kor_day_order)
-                            ax_weekly.set_xlabel("요일")
-                            ax_weekly.set_ylabel("처방량 증감")
-                            ax_weekly.grid(axis='y', linestyle='--', alpha=0.7)
-                            st.pyplot(fig_weekly)
+# forecast 데이터프레임에서 직접 컴포넌트 데이터를 추출하여 시각화
+fig, axes = plt.subplots(3, 1, figsize=(10, 15))
 
-                            # 3. 일간 패턴(Daily) - 업무 시간(9-18시)만 표시
-                            # 하루 중 시간대별 'daily' 효과 계산
-                            forecast['time'] = forecast['ds'].dt.time
-                            daily_effect = forecast.groupby('time')['daily'].mean()
-                            
-                            fig_daily, ax_daily = plt.subplots(figsize=(10, 4))
-                            daily_effect.plot(ax=ax_daily, color='lightgreen')
-                            ax_daily.set_title("일간 처방 패턴 (업무 시간 기준)")
-                            # x축을 8시부터 19시까지로 제한
-                            ax_daily.set_xlim([datetime.time(8, 0), datetime.time(19, 0)])
-                            ax_daily.set_xlabel("시간")
-                            ax_daily.set_ylabel("처방량 증감")
-                            ax_daily.grid(linestyle='--', alpha=0.7)
-                            st.pyplot(fig_daily)
+# 1. 트렌드(Trend) 그래프
+# forecast 데이터프레임에서 'ds'와 'trend' 컬럼을 직접 사용하여 그립니다.
+axes[0].plot(forecast['ds'], forecast['trend'], color='darkblue')
+axes[0].set_title("장기적 처방량 추세")
+axes[0].set_xlabel("날짜")
+axes[0].set_ylabel("처방량 변화")
+axes[0].grid(True, linestyle='--', alpha=0.7)
+
+# 2. 주간 패턴(Weekly) - 막대그래프로 업무일만 표시
+forecast['day_of_week'] = forecast['ds'].dt.day_name()
+weekly_effect = forecast.groupby('day_of_week')['weekly'].mean()
+day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+weekly_effect = weekly_effect.reindex(day_order)
+kor_day_order = ["월", "화", "수", "목", "금", "토"]
+
+weekly_effect.plot(kind='bar', ax=axes[1], color='skyblue', width=0.6, rot=0)
+axes[1].set_title("주간 처방 패턴 (업무일 기준)")
+axes[1].set_xlabel("요일")
+axes[1].set_ylabel("처방량 증감")
+axes[1].grid(axis='y', linestyle='--', alpha=0.7)
+axes[1].set_xticklabels(kor_day_order)
+
+# 3. 일간 패턴(Daily) - 업무 시간(9-18시)만 표시
+# 타임스탬프에서 시간 정보만 추출
+forecast['time_of_day'] = forecast['ds'].apply(lambda x: x.time())
+# 시간대별 평균 'daily' 효과 계산
+daily_effect = forecast.groupby('time_of_day')['daily'].mean()
+
+daily_effect.plot(ax=axes[2], color='lightgreen')
+axes[2].set_title("일간 처방 패턴 (업무 시간 기준)")
+# x축을 8시부터 19시까지로 제한
+axes[2].set_xlim([datetime.time(8, 0), datetime.time(19, 0)])
+axes[2].set_xlabel("시간")
+axes[2].set_ylabel("처방량 증감")
+axes[2].grid(linestyle='--', alpha=0.7)
+
+# 전체 레이아웃 조정
+fig.tight_layout()
+st.pyplot(fig)
 
                 except Exception as e:
                     st.error(f"오류가 발생했습니다: {e}")
