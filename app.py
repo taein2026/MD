@@ -49,7 +49,7 @@ train_start_date = st.sidebar.date_input("학습 시작일", datetime.date(2023,
 train_end_date = st.sidebar.date_input("학습 종료일 (이 날짜를 기준으로 예측)", datetime.date(2023, 12, 31))
 forecast_period = st.sidebar.number_input("예측 기간 (일)", min_value=1, max_value=365, value=14)
 
-run_button = st.sidebar.button("🚀 예측 실행")
+run_button = st.sidebar.button("예측 실행")
 
 # ==============================================================================
 # 📈 예측 및 시각화 실행
@@ -95,7 +95,7 @@ if run_button:
                             future = model.make_future_dataframe(periods=forecast_period, freq='D')
                             forecast = model.predict(future)
 
-                            st.subheader(f"📊 {train_start_date.strftime('%Y-%m-%d')} ~ {train_end_date.strftime('%Y-%m-%d')} 데이터 학습 결과 및 예측")
+                            st.subheader(f"{train_start_date.strftime('%Y-%m-%d')} ~ {train_end_date.strftime('%Y-%m-%d')} 데이터 학습 결과 및 예측")
                             
                             # --- ✨ 그래프 그리는 방식 수정 (색상 구분) ✨ ---
                             fig, ax = plt.subplots(figsize=(14, 7))
@@ -127,7 +127,7 @@ if run_button:
                             st.pyplot(fig)
 
                             # --- 패턴 분석 그래프 ---
-                            st.subheader("🔬 지정 기간 데이터의 패턴 분석")
+                            st.subheader("지정 기간 데이터의 패턴 분석")
                             fig2 = model.plot_components(forecast)
                             st.pyplot(fig2)
 
