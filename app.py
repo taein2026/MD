@@ -18,19 +18,24 @@ from prophet import Prophet
 import io
 
 # ==============================================================================
-# ✨ Matplotlib 한글 폰트 설정 (가장 먼저 실행) ✨
+# ✨ Matplotlib 한글 폰트 설정 (수정된 최종 버전) ✨
 # ==============================================================================
+# Streamlit Cloud 서버의 NanumGothic을 우선적으로 시도합니다.
 try:
-    plt.rc('font', family='Malgun Gothic') # Windows
+    plt.rc('font', family='NanumGothic')
+    print("✅ 나눔고딕 폰트가 성공적으로 설정되었습니다.")
 except:
+    # 서버에 폰트가 없거나, 로컬 환경일 경우 다른 폰트를 시도합니다.
+    print("⚠️ 나눔고딕을 찾을 수 없어 다른 폰트를 시도합니다.")
     try:
-        plt.rc('font', family='AppleGothic') # Mac
+        plt.rc('font', family='Malgun Gothic') # Windows
+        print("✅ 맑은고딕 폰트가 설정되었습니다.")
     except:
-        # 로컬에서 실행 시 아래 경로에 폰트 파일이 있어야 합니다.
         try:
-            plt.rc('font', family='NanumGothic')
+            plt.rc('font', family='AppleGothic') # Mac
+            print("✅ AppleGothic 폰트가 설정되었습니다.")
         except:
-            pass # 폰트가 없어도 앱은 실행되도록 함
+            print("❌ 사용 가능한 한글 폰트를 찾을 수 없습니다.")
 
 plt.rcParams['axes.unicode_minus'] = False # 마이너스 기호 깨짐 방지
 
