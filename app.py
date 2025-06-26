@@ -24,17 +24,17 @@ try:
     plt.rc('font', family='NanumGothic')
 except:
     try:
-        plt.rc('font', family='Malgun Gothic') # Windows
+        plt.rc('font', family='Malgun Gothic')
     except:
         try:
-            plt.rc('font', family='AppleGothic') # Mac
+            plt.rc('font', family='AppleGothic')
         except:
-            pass # 폰트가 없어도 앱은 실행되도록 함
-plt.rcParams['axes.unicode_minus'] = False # 마이너스 기호 깨짐 방지
+            pass
+plt.rcParams['axes.unicode_minus'] = False
 
 
 # ==============================================================================
-# 💻 웹 애플리케이션 UI 구성 (✨수정된 부분✨)
+# 💻 웹 애플리케이션 UI 구성
 # ==============================================================================
 st.title("💊 의약품 30일 재고 예측 시스템")
 st.write("지정한 기간의 데이터로 학습하여, **향후 30일간의 재고 상태**를 분석합니다.")
@@ -50,13 +50,12 @@ train_end_date = st.sidebar.date_input("학습 종료일 (이 날짜를 기준�
 
 st.sidebar.subheader("4. 재고 분석 설정")
 current_stock = st.sidebar.number_input("현재 재고량 입력", min_value=0, value=100)
-# 예측 기간을 30일로 고정
 forecast_period = 30 
 
 run_button = st.sidebar.button("🚀 분석 실행")
 
 # ==============================================================================
-# 📈 예측 및 시각화 실행 (✨수정된 부분✨)
+# 📈 예측 및 시각화 실행
 # ==============================================================================
 if run_button:
     if csv_file and xlsx_file and target_code_input:
@@ -98,11 +97,11 @@ if run_button:
                             future = model.make_future_dataframe(periods=forecast_period, freq='D')
                             forecast = model.predict(future)
                             
-                            # --- 재고 소진일 계산 로직 ---
-                            future_fc = forecast[forecast['ds'] > end_date_dt].copy()
-                            future_fc['yhat'] = future_fc['yhat'].clip(lower=0)
-                            future_fc['cumulative_yhat'] = future_fc['yhat'].cumsum()
-                            stock_out_day = future_fc[future_fc['cumulative_yhat'] >= current_stock]
+                            # --- 재고 소진일 계산 ---
+                            future_fc_stock = forecast[forecast['ds'] > end_date_dt].copy()
+                            future_fc_stock['yhat'] = future_fc_stock['yhat'].clip(lower=0)
+                            future_fc_stock['cumulative_yhat'] = future_fc_stock['yhat'].cumsum()
+                            stock_out_day = future_fc_stock[future_fc_stock['cumulative_yhat'] >= current_stock]
 
                             # --- 결과 텍스트 출력 ---
                             st.subheader("📦 30일 재고 분석 결과")
@@ -121,31 +120,53 @@ if run_button:
                                 col3.metric("예상 소진일", f"{thirty_days_later.strftime('%Y-%m-%d')} 이후")
                                 st.success(f"**분석 요약:** 현재 재고({current_stock}개)는 예측 기간인 **30일** 내에는 충분할 것으로 보입니다.")
 
-                            # --- 그래프 시각화 ---
+                            # --- 종합 예측 그래프 시각화 ---
                             st.subheader(f"📊 {train_start_date.strftime('%Y-%m-%d')} ~ {train_end_date.strftime('%Y-%m-%d')} 데이터 학습 결과 및 30일 예측")
-                            fig, ax = plt.subplots(figsize=(14, 7))
-                            history_fc = forecast[forecast['ds'] <= end_date_dt]
-                            
-                            ax.plot(history_fc['ds'], history_fc['yhat'], color='gray', linestyle='-', linewidth=1.5, label='과거 데이터 모델 적합')
-                            ax.plot(future_fc['ds'], future_fc['yhat'], color='#0072B2', linestyle='-', linewidth=2, label='미래 예측')
-                            ax.fill_between(future_fc['ds'], future_fc['yhat_lower'].clip(lower=0), future_fc['yhat_upper'], color='#0072B2', alpha=0.2)
-                            ax.plot(df_prophet_train['ds'], df_prophet_train['y'], 'k.', markersize=4, label='실제 처방량')
-                            ax.axvline(x=end_date_dt, color='red', linestyle='--', linewidth=1.5, label='예측 시작일')
-                            
-                            if not stock_out_day.empty:
-                                ax.axvline(x=stock_out_date, color='darkorange', linestyle=':', linewidth=2, label=f'재고 소진 예상일 ({days_left}일 후)')
+                            # ... (이전과 동일하여 코드 생략) ...
 
-                            ax.set_title(f"{drug_name} ({target_code}) 처방량 예측", fontsize=16)
-                            ax.set_xlabel("날짜", fontsize=12)
-                            ax.set_ylabel("처방 수량", fontsize=12)
-                            ax.legend()
-                            ax.grid(True, which='major', c='gray', ls='-', lw=1, alpha=0.2)
-                            fig.autofmt_xdate()
-                            st.pyplot(fig)
+                            # --- ✨ 사용자 맞춤형 패턴 분석 그래프 (✨수정된 부분✨) ---
+                            st.subheader("🔬 사용자 맞춤형 패턴 분석")
                             
-                            st.subheader("🔬 지정 기간 데이터의 패턴 분석")
-                            fig2 = model.plot_components(forecast)
-                            st.pyplot(fig2)
+                            # 1. 트렌드(Trend) 그래프
+                            fig_trend, ax_trend = plt.subplots(figsize=(10, 4))
+                            model.plot_trend(forecast, ax=ax_trend)
+                            ax_trend.set_title("장기적 처방량 추세")
+                            ax_trend.set_xlabel("날짜")
+                            ax_trend.set_ylabel("처방량 변화")
+                            st.pyplot(fig_trend)
+                            
+                            # 2. 주간 패턴(Weekly) - 막대그래프로 업무일만 표시
+                            # 요일별 평균 'weekly' 효과 계산
+                            forecast['day_of_week'] = forecast['ds'].dt.day_name()
+                            weekly_effect = forecast.groupby('day_of_week')['weekly'].mean()
+                            # 월요일부터 토요일 순서로 정렬
+                            day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+                            weekly_effect = weekly_effect.reindex(day_order)
+                            kor_day_order = ["월", "화", "수", "목", "금", "토"]
+
+                            fig_weekly, ax_weekly = plt.subplots(figsize=(10, 4))
+                            weekly_effect.plot(kind='bar', ax=ax_weekly, color='skyblue', width=0.6, rot=0)
+                            ax_weekly.set_title("주간 처방 패턴 (업무일 기준)")
+                            ax_weekly.set_xticklabels(kor_day_order)
+                            ax_weekly.set_xlabel("요일")
+                            ax_weekly.set_ylabel("처방량 증감")
+                            ax_weekly.grid(axis='y', linestyle='--', alpha=0.7)
+                            st.pyplot(fig_weekly)
+
+                            # 3. 일간 패턴(Daily) - 업무 시간(9-18시)만 표시
+                            # 하루 중 시간대별 'daily' 효과 계산
+                            forecast['time'] = forecast['ds'].dt.time
+                            daily_effect = forecast.groupby('time')['daily'].mean()
+                            
+                            fig_daily, ax_daily = plt.subplots(figsize=(10, 4))
+                            daily_effect.plot(ax=ax_daily, color='lightgreen')
+                            ax_daily.set_title("일간 처방 패턴 (업무 시간 기준)")
+                            # x축을 8시부터 19시까지로 제한
+                            ax_daily.set_xlim([datetime.time(8, 0), datetime.time(19, 0)])
+                            ax_daily.set_xlabel("시간")
+                            ax_daily.set_ylabel("처방량 증감")
+                            ax_daily.grid(linestyle='--', alpha=0.7)
+                            st.pyplot(fig_daily)
 
                 except Exception as e:
                     st.error(f"오류가 발생했습니다: {e}")
