@@ -63,7 +63,6 @@ if run_button:
             st.sidebar.error("오류: 학습 종료일은 시작일보다 빠를 수 없습니다.")
         else:
             with st.spinner('데이터를 처리하고 모델을 학습하는 중입니다... 잠시만 기다려 주세요.'):
-                # 이 try 블록은 모든 분석 과정에서 발생할 수 있는 오류를 잡아냅니다.
                 try:
                     # --- 데이터 불러오기 및 전처리 ---
                     df = pd.read_csv(csv_file, encoding='cp949', low_memory=False)
@@ -144,10 +143,11 @@ if run_button:
                             # --- 사용자 맞춤형 패턴 분석 그래프 ---
                             st.subheader("🔬 사용자 맞춤형 패턴 분석")
                             fig2, axes = plt.subplots(3, 1, figsize=(10, 15))
-                            
+                            fig2.tight_layout(pad=5.0)
+
                             # 1. 트렌드(Trend) 그래프
                             axes[0].plot(forecast['ds'], forecast['trend'], color='darkblue')
-                            axes[0].set_title("장기적 처방량 추세")
+                            axes[0].set_title("장기적 처방량 추세", fontsize=14)
                             axes[0].set_xlabel("날짜")
                             axes[0].set_ylabel("처방량 변화")
                             axes[0].grid(True, linestyle='--', alpha=0.7)
@@ -159,26 +159,26 @@ if run_button:
                             weekly_effect = weekly_effect.reindex(day_order)
                             kor_day_order = ["월", "화", "수", "목", "금", "토"]
                             weekly_effect.plot(kind='bar', ax=axes[1], color='skyblue', width=0.6, rot=0)
-                            axes[1].set_title("주간 처방 패턴 (업무일 기준)")
+                            axes[1].set_title("주간 처방 패턴 (업무일 기준)", fontsize=14)
                             axes[1].set_xlabel("요일")
                             axes[1].set_ylabel("처방량 증감")
                             axes[1].grid(axis='y', linestyle='--', alpha=0.7)
                             axes[1].set_xticklabels(kor_day_order)
 
                             # 3. 일간 패턴(Daily)
-                            forecast['time_of_day'] = forecast['ds'].apply(lambda x: x.time())
-                            daily_effect = forecast.groupby('time_of_day')['daily'].mean()
-                            daily_effect.plot(ax=axes[2], color='lightgreen')
-                            axes[2].set_title("일간 처방 패턴 (업무 시간 기준)")
-                            axes[2].set_xlim([datetime.time(8, 0), datetime.time(19, 0)])
-                            axes[2].set_xlabel("시간")
-                            axes[2].set_ylabel("처방 수량")
+                            axes[2].set_title("일간 처방 패턴 (업무 시간 기준)", fontsize=14)
+                            single_day_data = forecast[forecast['ds'].dt.date == forecast['ds'].dt.date.min()].copy()
+                            axes[2].plot(single_day_data['ds'], single_day_data['daily'], color='lightgreen', linewidth=2)
                             axes[2].grid(linestyle='--', alpha=0.7)
-
-                            fig2.tight_layout()
+                            axes[2].set_xlabel("시간")
+                            axes[2].set_ylabel("처방량 증감")
+                            axes[2].xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+                            start_time = pd.to_datetime(single_day_data['ds'].dt.date.iloc[0]) + pd.DateOffset(hours=8)
+                            end_time = pd.to_datetime(single_day_data['ds'].dt.date.iloc[0]) + pd.DateOffset(hours=19)
+                            axes[2].set_xlim([start_time, end_time])
+                            
                             st.pyplot(fig2)
 
-                # 여기가 바로 위 try 구문을 마무리하는 except 블록입니다.
                 except Exception as e:
                     st.error(f"분석 중 오류가 발생했습니다: {e}")
     else:
